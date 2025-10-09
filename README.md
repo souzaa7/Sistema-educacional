@@ -33,5 +33,5 @@ git push origin main    # Enviar alterações para o GitHub
 
 Contatos
 	•	Gabriel Souza: souzaknn@gmail.com
-	•	Vitor Gabriel: [email ou GitHub]
+	•	Vitor Gabriel: vitor.geraldo.vg7@gmail.com
 	•	João Vitor: [email ou GitHub]
