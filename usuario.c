@@ -2,53 +2,59 @@
 #include <stdlib.h>
 #include <string.h>
 #include "usuario.h"
-#include "conteudo.h"
-#include "atividade.h"
-#include "nota.h"
 
 #define USUARIOS_FILE "usuarios.csv"
+#define LINE_BUF 512
 
-/* utilitarios */
-void limparBuffer() {
-    int c;
-    while ((c = getchar()) != '\n' && c != EOF) ;
-}
+/* ------------------ Funções utilitárias ------------------ */
 
 int file_exists(const char *path) {
     FILE *f = fopen(path, "r");
-    if (f) { fclose(f); return 1; }
+    if (f) {
+        fclose(f);
+        return 1;
+    }
     return 0;
 }
 
-/* cadastrar usuario (append) */
+void limparBuffer() {
+    int c;
+    while ((c = getchar()) != '\n' && c != EOF);
+}
+
+/* ------------------ Funções de Usuário ------------------ */
+
 void cadastrarUsuario() {
     Usuario u;
     FILE *f;
+    int arquivo_existe;
 
     printf("\n=== CADASTRO DE USUARIO ===\n");
-    printf("Tipo (aluno/professor/adm): ");
-    scanf("%19s", u.tipo); limparBuffer();
+    printf("CPF: ");
+    scanf("%s", u.cpf);
+    limparBuffer();
 
-    printf("Nome: ");
+    printf("Senha: ");
+    scanf("%s", u.senha);
+    limparBuffer();
+
+    printf("Nome (sem virgula): ");
     fgets(u.nome, MAX_NOME, stdin);
     u.nome[strcspn(u.nome, "\n")] = '\0';
 
-    printf("CPF (apenas numeros): ");
-    scanf("%19s", u.cpf); limparBuffer();
+    printf("Tipo (aluno/professor/admin): ");
+    scanf("%s", u.tipo);
+    limparBuffer();
 
-    printf("Senha: ");
-    scanf("%49s", u.senha); limparBuffer();
-
-    /* checar duplicado */
-    if (file_exists(USUARIOS_FILE)) {
-        f = fopen(USUARIOS_FILE, "r");
-        if (!f) { printf("Erro ao abrir arquivo de usuarios.\n"); return; }
+    // Verifica duplicidade
+    f = fopen(USUARIOS_FILE, "r");
+    if (f) {
         char linha[LINE_BUF];
         while (fgets(linha, sizeof(linha), f)) {
-            char tipo[MAX_TIPO], cpf[MAX_CPF], senha[MAX_SENHA], nome[MAX_NOME];
-            if (sscanf(linha, "%[^,],%[^,],%[^,],%[^\n]", tipo, cpf, senha, nome) == 4) {
+            char cpf[MAX_CPF], senha[MAX_SENHA], nome[MAX_NOME], tipo[MAX_TIPO];
+            if (sscanf(linha, "%[^,],%[^,],%[^,],%[^\n]", cpf, senha, nome, tipo) == 4) {
                 if (strcmp(cpf, u.cpf) == 0) {
-                    printf("CPF ja cadastrado. Cadastro cancelado.\n");
+                    printf("Erro: CPF ja cadastrado.\n");
                     fclose(f);
                     return;
                 }
@@ -57,48 +63,131 @@ void cadastrarUsuario() {
         fclose(f);
     }
 
-    f = fopen(USUARIOS_FILE, "a");
-    if (!f) { printf("Erro ao abrir arquivo para escrita.\n"); return; }
-    /* se o arquivo estava vazio, adicionar cabecalho - vamos checar posicao */
-    if (ftell(f) == 0 && !file_exists(USUARIOS_FILE)) {
-        /* se for um novo arquivo criado por fopen, escreve cabecalho */
-        fprintf(f, "tipo,cpf,senha,nome\n");
-    }
-    /* appende */
-    fprintf(f, "%s,%s,%s,%s\n", u.tipo, u.cpf, u.senha, u.nome);
-    fclose(f);
+    // Verifica se o arquivo existe
+    arquivo_existe = file_exists(USUARIOS_FILE);
 
-    printf("Usuario cadastrado com sucesso.\n");
+    // Abre para escrita (modo w se for novo, modo a se ja existir)
+    f = fopen(USUARIOS_FILE, arquivo_existe ? "a" : "w");
+    if (!f) {
+        printf("Erro ao abrir usuarios.csv!\n");
+        return;
+    }
+
+    // Se for um novo arquivo, escreve o cabeçalho na ordem correta
+    if (!arquivo_existe) {
+        fprintf(f, "cpf,senha,nome,tipo\n");
+    }
+
+    // Grava o usuário na ordem correta
+    fprintf(f, "%s,%s,%s,%s\n", u.cpf, u.senha, u.nome, u.tipo);
+
+    fclose(f);
+    printf("Usuario cadastrado com sucesso!\n");
 }
 
-/* login por CPF+senha */
-int loginUsuario(Usuario *u) {
-    char cpf_busca[MAX_CPF];
-    char senha_busca[MAX_SENHA];
-
-    if (!file_exists(USUARIOS_FILE)) {
+void listarUsuarios() {
+    FILE *f = fopen(USUARIOS_FILE, "r");
+    if (!f) {
         printf("Nenhum usuario cadastrado ainda.\n");
+        return;
+    }
+
+    char linha[LINE_BUF];
+    printf("\n=== LISTA DE USUARIOS ===\n");
+
+    // pula cabeçalho
+    fgets(linha, sizeof(linha), f);
+
+    while (fgets(linha, sizeof(linha), f)) {
+        char cpf[MAX_CPF], senha[MAX_SENHA], nome[MAX_NOME], tipo[MAX_TIPO];
+        if (sscanf(linha, "%[^,],%[^,],%[^,],%[^\n]", cpf, senha, nome, tipo) == 4) {
+            printf("CPF: %s | Nome: %s | Tipo: %s\n", cpf, nome, tipo);
+        }
+    }
+
+    fclose(f);
+}
+
+void removerUsuario() {
+    char cpfRemover[MAX_CPF];
+    printf("\n=== REMOVER USUARIO ===\n");
+    printf("Digite o CPF do usuario: ");
+    scanf("%s", cpfRemover);
+    limparBuffer();
+
+    FILE *f = fopen(USUARIOS_FILE, "r");
+    if (!f) {
+        printf("Arquivo usuarios.csv nao encontrado.\n");
+        return;
+    }
+
+    FILE *tmp = fopen("usuarios_tmp.csv", "w");
+    if (!tmp) {
+        printf("Erro ao criar arquivo temporario.\n");
+        fclose(f);
+        return;
+    }
+
+    char linha[LINE_BUF];
+    int removido = 0;
+
+    // cabeçalho
+    fprintf(tmp, "cpf,senha,nome,tipo\n");
+
+    // processar o resto
+    fgets(linha, sizeof(linha), f);
+    while (fgets(linha, sizeof(linha), f)) {
+        char cpf[MAX_CPF], senha[MAX_SENHA], nome[MAX_NOME], tipo[MAX_TIPO];
+        if (sscanf(linha, "%[^,],%[^,],%[^,],%[^\n]", cpf, senha, nome, tipo) == 4) {
+            if (strcmp(cpf, cpfRemover) != 0)
+                fprintf(tmp, "%s,%s,%s,%s\n", cpf, senha, nome, tipo);
+            else
+                removido = 1;
+        }
+    }
+
+    fclose(f);
+    fclose(tmp);
+
+    remove(USUARIOS_FILE);
+    rename("usuarios_tmp.csv", USUARIOS_FILE);
+
+    if (removido)
+        printf("Usuario removido com sucesso.\n");
+    else
+        printf("Usuario nao encontrado.\n");
+}
+
+/* ------------------ Função de Login ------------------ */
+
+int loginUsuario(Usuario *u) {
+    char cpf[MAX_CPF], senha[MAX_SENHA];
+    printf("\n=== LOGIN ===\n");
+    printf("CPF: ");
+    scanf("%s", cpf);
+    limparBuffer();
+
+    printf("Senha: ");
+    scanf("%s", senha);
+    limparBuffer();
+
+    FILE *f = fopen(USUARIOS_FILE, "r");
+    if (!f) {
+        printf("Arquivo usuarios.csv nao encontrado.\n");
         return 0;
     }
 
-    printf("\n=== LOGIN ===\n");
-    printf("CPF: ");
-    scanf("%19s", cpf_busca); limparBuffer();
-    printf("Senha: ");
-    scanf("%49s", senha_busca); limparBuffer();
-
-    FILE *f = fopen(USUARIOS_FILE, "r");
-    if (!f) { printf("Erro ao abrir usuarios.\n"); return 0; }
-
     char linha[LINE_BUF];
+    fgets(linha, sizeof(linha), f); // pula cabeçalho
+
     while (fgets(linha, sizeof(linha), f)) {
-        char tipo[MAX_TIPO], cpf[MAX_CPF], senha[MAX_SENHA], nome[MAX_NOME];
-        if (sscanf(linha, "%[^,],%[^,],%[^,],%[^\n]", tipo, cpf, senha, nome) == 4) {
-            if (strcmp(cpf, cpf_busca) == 0 && strcmp(senha, senha_busca) == 0) {
-                strncpy(u->tipo, tipo, MAX_TIPO-1); u->tipo[MAX_TIPO-1] = '\0';
-                strncpy(u->cpf, cpf, MAX_CPF-1); u->cpf[MAX_CPF-1] = '\0';
-                strncpy(u->senha, senha, MAX_SENHA-1); u->senha[MAX_SENHA-1] = '\0';
-                strncpy(u->nome, nome, MAX_NOME-1); u->nome[MAX_NOME-1] = '\0';
+        char c[MAX_CPF], s[MAX_SENHA], n[MAX_NOME], t[MAX_TIPO];
+        if (sscanf(linha, "%[^,],%[^,],%[^,],%[^\n]", c, s, n, t) == 4) {
+            if (strcmp(c, cpf) == 0 && strcmp(s, senha) == 0) {
+                strcpy(u->cpf, c);
+                strcpy(u->senha, s);
+                strcpy(u->nome, n);
+                strcpy(u->tipo, t);
                 fclose(f);
                 return 1;
             }
@@ -109,131 +198,90 @@ int loginUsuario(Usuario *u) {
     return 0;
 }
 
-/* listar usuarios (oculta senha) */
-void listarUsuarios() {
-    if (!file_exists(USUARIOS_FILE)) {
-        printf("Nenhum usuario cadastrado.\n");
-        return;
-    }
-    FILE *f = fopen(USUARIOS_FILE, "r");
-    if (!f) { printf("Erro ao abrir arquivo.\n"); return; }
+/* ------------------ Menus ------------------ */
 
-    char linha[LINE_BUF];
-    printf("\n=== LISTA DE USUARIOS ===\n");
-    while (fgets(linha, sizeof(linha), f)) {
-        char tipo[MAX_TIPO], cpf[MAX_CPF], senha[MAX_SENHA], nome[MAX_NOME];
-        if (sscanf(linha, "%[^,],%[^,],%[^,],%[^\n]", tipo, cpf, senha, nome) == 4) {
-            /* ocultar senha com asteriscos */
-            int len = (int)strlen(senha);
-            char oculto[60] = {0};
-            for (int i = 0; i < len && i < 58; i++) oculto[i] = '*';
-            oculto[(len<58)?len:58] = '\0';
-            printf("Tipo: %s | CPF: %s | Senha: %s | Nome: %s\n", tipo, cpf, oculto, nome);
-        }
-    }
-    fclose(f);
-}
-
-/* remover usuario por CPF */
-void removerUsuario() {
-    char cpf_busca[MAX_CPF];
-    printf("\nCPF do usuario a remover: ");
-    scanf("%19s", cpf_busca); limparBuffer();
-
-    if (!file_exists(USUARIOS_FILE)) {
-        printf("Arquivo de usuarios nao encontrado.\n");
-        return;
-    }
-
-    FILE *f = fopen(USUARIOS_FILE, "r");
-    FILE *tmp = fopen("usuarios_tmp.csv", "w");
-    if (!f || !tmp) { printf("Erro ao abrir arquivos.\n"); if (f) fclose(f); if (tmp) fclose(tmp); return; }
-
-    char linha[LINE_BUF];
-    int removido = 0;
-
-    while (fgets(linha, sizeof(linha), f)) {
-        char tipo[MAX_TIPO], cpf[MAX_CPF], senha[MAX_SENHA], nome[MAX_NOME];
-        if (sscanf(linha, "%[^,],%[^,],%[^,],%[^\n]", tipo, cpf, senha, nome) == 4) {
-            if (strcmp(cpf, cpf_busca) == 0) { removido = 1; continue; }
-            fprintf(tmp, "%s,%s,%s,%s\n", tipo, cpf, senha, nome);
-        }
-    }
-
-    fclose(f); fclose(tmp);
-    remove(USUARIOS_FILE);
-    rename("usuarios_tmp.csv", USUARIOS_FILE);
-
-    if (removido) printf("Usuario removido com sucesso.\n");
-    else printf("Usuario nao encontrado.\n");
-}
-
-/* MENUS */
 void menuAluno(Usuario *u) {
-    int opc;
+    int opcao;
     do {
-        printf("\n=== MENU ALUNO (%s) ===\n", u->nome);
-        printf("1 - Listar conteudos\n");
-        printf("2 - Enviar atividade\n");
-        printf("3 - Ver notas\n");
-        printf("0 - Sair\n");
-        printf("Opcao: ");
-        if (scanf("%d", &opc) != 1) { limparBuffer(); opc = -1; }
-        limparBuffer();
-        switch (opc) {
-            case 1: listarConteudos(); break;
-            case 2: enviarAtividade(u->cpf); break;
-            case 3: verNotas(u->cpf); break;
-            case 0: printf("Saindo do menu do aluno.\n"); break;
-            default: printf("Opcao invalida.\n");
+        printf("\n=== MENU ALUNO ===\n");
+        printf("1. Enviar atividade\n");
+        printf("2. Ver boletim\n");
+        printf("0. Sair\n");
+        printf("Escolha: ");
+        scanf("%d", &opcao);
+
+        switch (opcao) {
+            case 1:
+                printf("Funcao de envio de atividade ainda nao implementada.\n");
+                break;
+            case 2:
+                printf("Funcao de visualizacao de boletim ainda nao implementada.\n");
+                break;
+            case 0:
+                printf("Saindo...\n");
+                break;
+            default:
+                printf("Opcao invalida!\n");
         }
-    } while (opc != 0);
+    } while (opcao != 0);
 }
 
 void menuProfessor(Usuario *u) {
-    int opc;
+    int opcao;
     do {
-        printf("\n=== MENU PROFESSOR (%s) ===\n", u->nome);
-        printf("1 - Postar conteudo\n");
-        printf("2 - Postar atividade\n");
-        printf("3 - Listar atividades\n");
-        printf("4 - Avaliar atividade\n");
-        printf("5 - Lancar notas (NP1/NP2)\n");
-        printf("0 - Sair\n");
-        printf("Opcao: ");
-        if (scanf("%d", &opc) != 1) { limparBuffer(); opc = -1; }
-        limparBuffer();
-        switch (opc) {
-            case 1: postarConteudo(u->cpf); break;
-            case 2: postarAtividade(u->cpf); break;
-            case 3: listarAtividades(); break;
-            case 4: avaliarAtividade(); break;
-            case 5: lancarNota(); break;
-            case 0: printf("Saindo do menu do professor.\n"); break;
-            default: printf("Opcao invalida.\n");
+        printf("\n=== MENU PROFESSOR ===\n");
+        printf("1. Postar atividade\n");
+        printf("2. Avaliar atividade\n");
+        printf("3. Lancar notas\n");
+        printf("0. Sair\n");
+        printf("Escolha: ");
+        scanf("%d", &opcao);
+
+        switch (opcao) {
+            case 1:
+                printf("Funcao de postar atividade ainda nao implementada.\n");
+                break;
+            case 2:
+                printf("Funcao de avaliar atividade ainda nao implementada.\n");
+                break;
+            case 3:
+                printf("Funcao de lancar notas ainda nao implementada.\n");
+                break;
+            case 0:
+                printf("Saindo...\n");
+                break;
+            default:
+                printf("Opcao invalida!\n");
         }
-    } while (opc != 0);
+    } while (opcao != 0);
 }
 
 void menuAdministrador(Usuario *u) {
-    int opc;
+    int opcao;
     do {
-        printf("\n=== MENU ADMINISTRADOR (%s) ===\n", u->nome);
-        printf("1 - Cadastrar usuario\n");
-        printf("2 - Remover usuario\n");
-        printf("3 - Listar usuarios\n");
-        printf("4 - Gerar relatorio de medias\n");
-        printf("0 - Sair\n");
-        printf("Opcao: ");
-        if (scanf("%d", &opc) != 1) { limparBuffer(); opc = -1; }
-        limparBuffer();
-        switch (opc) {
-            case 1: cadastrarUsuario(); break;
-            case 2: removerUsuario(); break;
-            case 3: listarUsuarios(); break;
-            case 4: gerarRelatorio(); break;
-            case 0: printf("Saindo do menu do administrador.\n"); break;
-            default: printf("Opcao invalida.\n");
+        printf("\n=== MENU ADMINISTRADOR ===\n");
+        printf("1. Cadastrar usuario\n");
+        printf("2. Listar usuarios\n");
+        printf("3. Remover usuario\n");
+        printf("0. Sair\n");
+        printf("Escolha: ");
+        scanf("%d", &opcao);
+
+        switch (opcao) {
+            case 1:
+                cadastrarUsuario();
+                break;
+            case 2:
+                listarUsuarios();
+                break;
+            case 3:
+                removerUsuario();
+                break;
+            case 0:
+                printf("Saindo...\n");
+                break;
+            default:
+                printf("Opcao invalida!\n");
         }
-    } while (opc != 0);
+    } while (opcao != 0);
 }
