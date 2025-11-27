@@ -6,7 +6,7 @@
 #define MAX_SENHA 50
 #define MAX_NOME 100
 #define MAX_DISCIPLINA 100
-#define MAX_DESC 256
+#define MAX_DESC 300
 #define LINE_BUF 512
 
 typedef struct {

@@ -1,30 +1,31 @@
 #ifndef ATIVIDADE_H
 #define ATIVIDADE_H
 
-#include "usuario.h"
-
-typedef struct {
-    char cpf_aluno[MAX_CPF];
-    char disciplina[MAX_DISCIPLINA];
-    char descricao[MAX_DESC];
-    char nota[16];
-    char status[20];
-} Atividade;
+#define MAX_CPF 20
+#define MAX_DISCIPLINA 100
+#define MAX_DESC 300
+#define LINE_BUF 512
 
 typedef struct {
     int id;
+    char tipo[20];            // "publicada" ou "submissao"
     int atividade_id;
-    char aluno_cpf[MAX_CPF];
+    char cpf_autor[MAX_CPF];
+    char disciplina[MAX_DISCIPLINA];
+    char descricao[MAX_DESC];
     char arquivo[200];
-    char dataEnvio[30];
+    char data[40];
     char nota[16];
     char status[20];
-} Submissao;
+} RegistroAtividade;
 
-void enviarAtividade(const char *cpfAluno);
-void listarAtividades();
 void postarAtividade(const char *cpfProfessor);
-void listarSubmissoes();
-void avaliarAtividade();
+void listarAtividadesProfessor();
+void listarAtividadesAluno();
+void enviarSubmissao(const char *cpfAluno);
+void listarMinhasSubmissoes(const char *cpfAluno);
+void avaliarSubmissao();
+int file_exists(const char *path);
+void limparBuffer();
 
 #endif

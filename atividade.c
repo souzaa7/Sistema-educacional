@@ -2,184 +2,258 @@
 #include <stdlib.h>
 #include <string.h>
 #include "atividade.h"
-#include "usuario.h"
 
 #define ATIVIDADES_FILE "atividades.csv"
-#define SUBMISSOES_FILE "submissoes.csv"
 
-extern int file_exists(const char *path);
-extern void limparBuffer();
 
-/* geradores de id simples */
-static int nextAtividadeId() {
+/* --------------------------------------
+        GERAÇÃO DE IDs
+---------------------------------------*/
+
+static int nextId() {
+    if (!file_exists(ATIVIDADES_FILE)) return 1;
+
     FILE *f = fopen(ATIVIDADES_FILE, "r");
-    if (!f) return 1;
     char linha[LINE_BUF];
-    int max = 0;
+    int maxID = 0;
+
     while (fgets(linha, sizeof(linha), f)) {
         int id;
-        if (sscanf(linha, "%d,%*[^,],%*[^,],%*[^,],%*[^,\n]", &id) == 1) if (id > max) max = id;
+        if (sscanf(linha, "%d,", &id) == 1)
+            if (id > maxID) maxID = id;
     }
     fclose(f);
-    return max + 1;
+    return maxID + 1;
 }
 
-static int nextSubId() {
-    FILE *f = fopen(SUBMISSOES_FILE, "r");
-    if (!f) return 1;
-    char linha[LINE_BUF];
-    int max = 0;
-    while (fgets(linha, sizeof(linha), f)) {
-        int id;
-        if (sscanf(linha, "%d,%*d,%*[^,],%*[^,],%*[^,],%*[^,],%*s", &id) == 1) if (id > max) max = id;
-    }
-    fclose(f);
-    return max + 1;
-}
+/* --------------------------------------
+        PROFESSOR – POSTAR ATIVIDADE
+---------------------------------------*/
 
-/* PROFESSOR - postar atividade (com id) */
 void postarAtividade(const char *cpfProfessor) {
     FILE *f;
     int existe = file_exists(ATIVIDADES_FILE);
     f = fopen(ATIVIDADES_FILE, "a");
-    if (!f) { printf("Erro ao abrir arquivo de atividades.\n"); return; }
-    if (!existe) fprintf(f, "id,disciplina,descricao,autor_cpf,dataEntrega\n");
 
-    int id = nextAtividadeId();
-    char disciplina[MAX_DISCIPLINA], descricao[MAX_DESC], dataEntrega[30];
+    if (!f) { printf("Erro ao abrir arquivo.\n"); return; }
+
+    if (!existe) {
+        fprintf(f, "id,tipo,atividade_id,cpf_autor,disciplina,descricao,arquivo,data,nota,status\n");
+    }
+
+    RegistroAtividade r;
+    r.id = nextId();
+    strcpy(r.tipo, "publicada");
+    r.atividade_id = 0;
+    strcpy(r.cpf_autor, cpfProfessor);
 
     printf("\n=== POSTAR ATIVIDADE ===\n");
     printf("Disciplina: ");
-    fgets(disciplina, sizeof(disciplina), stdin); disciplina[strcspn(disciplina, "\n")] = '\0';
+    fgets(r.disciplina, sizeof(r.disciplina), stdin);
+    r.disciplina[strcspn(r.disciplina, "\n")] = 0;
+
     printf("Descricao: ");
-    fgets(descricao, sizeof(descricao), stdin); descricao[strcspn(descricao, "\n")] = '\0';
-    printf("Data de entrega (ex: 2025-11-12): ");
-    fgets(dataEntrega, sizeof(dataEntrega), stdin); dataEntrega[strcspn(dataEntrega, "\n")] = '\0';
+    fgets(r.descricao, sizeof(r.descricao), stdin);
+    r.descricao[strcspn(r.descricao, "\n")] = 0;
 
-    /* confirmacao */
-    char conf;
-    printf("Confirmar publicacao da atividade? (S/N): ");
-    scanf(" %c", &conf); limparBuffer();
-    if (conf != 'S' && conf != 's') { printf("Publicacao cancelada.\n"); fclose(f); return; }
+    printf("Data entrega (AAAA-MM-DD): ");
+    fgets(r.data, sizeof(r.data), stdin);
+    r.data[strcspn(r.data, "\n")] = 0;
 
-    fprintf(f, "%d,%s,%s,%s,%s\n", id, disciplina, descricao, cpfProfessor, dataEntrega);
+    fprintf(f, "%d,publicada,0,%s,%s,%s,,%s,,Pendente\n",
+        r.id, r.cpf_autor, r.disciplina, r.descricao, r.data);
+
     fclose(f);
     printf("Atividade publicada com sucesso.\n");
 }
 
-/* ALUNO - enviar submissao para uma atividade */
-void enviarAtividade(const char *cpfAluno) {
-    FILE *f;
-    int existe = file_exists(SUBMISSOES_FILE);
-    f = fopen(SUBMISSOES_FILE, "a");
-    if (!f) { printf("Erro ao abrir arquivo de submissoes.\n"); return; }
-    if (!existe) fprintf(f, "id,atividade_id,aluno_cpf,arquivo,dataEnvio,nota,status\n");
+/* --------------------------------------
+        PROFESSOR – LISTAR ATIVIDADES
+---------------------------------------*/
 
-    Submissao s;
-    s.id = nextSubId();
-    printf("\n=== ENVIAR SUBMISSAO ===\n");
-    printf("ID da atividade: ");
-    if (scanf("%d", &s.atividade_id) != 1) { limparBuffer(); printf("ID invalido.\n"); fclose(f); return; }
-    limparBuffer();
-    strncpy(s.aluno_cpf, cpfAluno, MAX_CPF-1); s.aluno_cpf[MAX_CPF-1] = '\0';
-    printf("Resumo do arquivo/enlace: ");
-    fgets(s.arquivo, sizeof(s.arquivo), stdin); s.arquivo[strcspn(s.arquivo, "\n")] = '\0';
-    printf("Data envio (ex: 2025-11-10): ");
-    fgets(s.dataEnvio, sizeof(s.dataEnvio), stdin); s.dataEnvio[strcspn(s.dataEnvio, "\n")] = '\0';
-    strcpy(s.nota, "");
-    strcpy(s.status, "Pendente");
+void listarAtividadesProfessor() {
+    if (!file_exists(ATIVIDADES_FILE)) {
+        printf("Nenhuma atividade publicada.\n");
+        return;
+    }
 
-    /* confirmacao */
-    char conf;
-    printf("Confirmar envio desta submissao? (S/N): ");
-    scanf(" %c", &conf); limparBuffer();
-    if (conf != 'S' && conf != 's') { printf("Envio cancelado.\n"); fclose(f); return; }
-
-    fprintf(f, "%d,%d,%s,%s,%s,%s,%s\n", s.id, s.atividade_id, s.aluno_cpf, s.arquivo, s.dataEnvio, s.nota, s.status);
-    fclose(f);
-    printf("Submissao enviada com sucesso.\n");
-}
-
-/* PROFESSOR - listar atividades postadas (para consulta) */
-void listarAtividades() {
-    if (!file_exists(ATIVIDADES_FILE)) { printf("Nenhuma atividade publica.\n"); return; }
     FILE *f = fopen(ATIVIDADES_FILE, "r");
-    if (!f) { printf("Erro ao abrir atividades.csv\n"); return; }
     char linha[LINE_BUF];
+
     printf("\n=== ATIVIDADES PUBLICADAS ===\n");
+
     while (fgets(linha, sizeof(linha), f)) {
-        int id; char disciplina[MAX_DISCIPLINA], descricao[MAX_DESC], autor[MAX_CPF], dataEntrega[30];
-        if (sscanf(linha, "%d,%[^,],%[^,],%[^,],%[^\n]", &id, disciplina, descricao, autor, dataEntrega) == 5) {
-            printf("ID:%d | Disciplina:%s | Autor:%s | Entrega:%s\n  %s\n", id, disciplina, autor, dataEntrega, descricao);
+        int id, atividade_id;
+        char tipo[20], cpf[20], disc[100], desc[300], arquivo[200], data[40], nota[16], status[20];
+
+        sscanf(linha, "%d,%[^,],%d,%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%s",
+            &id, tipo, &atividade_id, cpf, disc, desc, arquivo, data, nota, status);
+
+        if (strcmp(tipo, "publicada") == 0) {
+            printf("\nID: %d | Disciplina: %s | Entrega: %s\n%s\n", id, disc, data, desc);
         }
     }
     fclose(f);
 }
 
-/* PROFESSOR - listar e avaliar submissao */
-void listarSubmissoes() {
-    if (!file_exists(SUBMISSOES_FILE)) { printf("Nenhuma submissao registrada.\n"); return; }
-    FILE *f = fopen(SUBMISSOES_FILE, "r");
-    if (!f) { printf("Erro ao abrir submissoes.csv\n"); return; }
+/* --------------------------------------
+        ALUNO – LISTAR ATIVIDADES DISPONÍVEIS
+---------------------------------------*/
+
+void listarAtividadesAluno() {
+    if (!file_exists(ATIVIDADES_FILE)) {
+        printf("Nenhuma atividade encontrada.\n");
+        return;
+    }
+
+    FILE *f = fopen(ATIVIDADES_FILE, "r");
     char linha[LINE_BUF];
-    printf("\n=== SUBMISSOES ===\n");
+
+    printf("\n=== ATIVIDADES DISPONÍVEIS ===\n");
+
     while (fgets(linha, sizeof(linha), f)) {
-        int id, aid; char aluno[MAX_CPF], arquivo[200], data[30], nota[16], status[20];
-        if (sscanf(linha, "%d,%d,%[^,],%[^,],%[^,],%[^,],%[^\n]", &id, &aid, aluno, arquivo, data, nota, status) >= 4) {
-            printf("SubID:%d AtivID:%d Aluno:%s Status:%s Nota:%s\n  %s (enviado:%s)\n", id, aid, aluno, status, (strlen(nota)?nota:"-"), arquivo, data);
+        int id, atividade_id;
+        char tipo[20], cpf[20], disc[100], desc[300], arquivo[200], data[40], nota[16], status[20];
+
+        sscanf(linha, "%d,%[^,],%d,%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%s",
+            &id, tipo, &atividade_id, cpf, disc, desc, arquivo, data, nota, status);
+
+        if (strcmp(tipo, "publicada") == 0) {
+            printf("\nID: %d\nDisciplina: %s\nDescricao: %s\nEntrega: %s\n",
+                id, disc, desc, data);
         }
     }
     fclose(f);
 }
 
-/* PROFESSOR - avaliar submissao (procura por id de submissao) */
-void avaliarAtividade() {
-    if (!file_exists(SUBMISSOES_FILE)) { printf("Nenhuma submissao registrada.\n"); return; }
-    int subId;
-    printf("ID da submissao a avaliar: ");
-    if (scanf("%d", &subId) != 1) { limparBuffer(); printf("ID invalido.\n"); return; }
+/* --------------------------------------
+        ALUNO – ENVIAR SUBMISSÃO
+---------------------------------------*/
+
+void enviarSubmissao(const char *cpfAluno) {
+    FILE *f;
+    int existe = file_exists(ATIVIDADES_FILE);
+    f = fopen(ATIVIDADES_FILE, "a");
+
+    if (!f) { printf("Erro ao abrir arquivo.\n"); return; }
+
+    if (!existe) {
+        fprintf(f, "id,tipo,atividade_id,cpf_autor,disciplina,descricao,arquivo,data,nota,status\n");
+    }
+
+    RegistroAtividade r;
+    r.id = nextId();
+    strcpy(r.tipo, "submissao");
+
+    printf("\n=== ENVIAR SUBMISSAO ===\nID da atividade: ");
+    scanf("%d", &r.atividade_id);
     limparBuffer();
 
-    FILE *f = fopen(SUBMISSOES_FILE, "r");
-    FILE *tmp = fopen("submissoes_tmp.csv", "w");
-    if (!f || !tmp) { if (f) fclose(f); if (tmp) fclose(tmp); printf("Erro ao abrir arquivos.\n"); return; }
+    strcpy(r.cpf_autor, cpfAluno);
+
+    printf("Arquivo (nome): ");
+    fgets(r.arquivo, sizeof(r.arquivo), stdin);
+    r.arquivo[strcspn(r.arquivo, "\n")] = 0;
+
+    printf("Data envio (AAAA-MM-DD): ");
+    fgets(r.data, sizeof(r.data), stdin);
+    r.data[strcspn(r.data, "\n")] = 0;
+
+    fprintf(f, "%d,submissao,%d,%s,,,,%s,,Pendente\n",
+        r.id, r.atividade_id, r.cpf_autor, r.data);
+
+    fclose(f);
+    printf("Submissao enviada!\n");
+}
+
+/* --------------------------------------
+        ALUNO – LISTAR SUAS SUBMISSÕES
+---------------------------------------*/
+
+void listarMinhasSubmissoes(const char *cpfAluno) {
+    if (!file_exists(ATIVIDADES_FILE)) {
+        printf("Nenhuma submissao encontrada.\n");
+        return;
+    }
+
+    FILE *f = fopen(ATIVIDADES_FILE, "r");
+    char linha[LINE_BUF];
+
+    printf("\n=== MINHAS SUBMISSOES ===\n");
+
+    while (fgets(linha, sizeof(linha), f)) {
+        int id, atividade_id;
+        char tipo[20], cpf[20], disc[100], desc[300], arquivo[200], data[40], nota[16], status[20];
+
+        sscanf(linha, "%d,%[^,],%d,%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%s",
+            &id, tipo, &atividade_id, cpf, disc, desc, arquivo, data, nota, status);
+
+        if (strcmp(tipo, "submissao") == 0 && strcmp(cpf, cpfAluno) == 0) {
+
+            printf("\nAtividade: %d | Arquivo: %s\nEnviado: %s | Nota: %s | Status: %s\n",
+                atividade_id, arquivo, data, nota, status);
+        }
+    }
+    fclose(f);
+}
+
+/* --------------------------------------
+        PROFESSOR – AVALIAR SUBMISSÃO
+---------------------------------------*/
+
+void avaliarSubmissao() {
+    if (!file_exists(ATIVIDADES_FILE)) {
+        printf("Nenhuma submissao encontrada.\n");
+        return;
+    }
+
+    int idAvaliar;
+    printf("ID da submissao: ");
+    scanf("%d", &idAvaliar);
+    limparBuffer();
+
+    FILE *f = fopen(ATIVIDADES_FILE, "r");
+    FILE *tmp = fopen("temp.csv", "w");
 
     char linha[LINE_BUF];
-    int avaliado = 0;
+    int encontrado = 0;
+
+    fprintf(tmp, "id,tipo,atividade_id,cpf_autor,disciplina,descricao,arquivo,data,nota,status\n");
+
     while (fgets(linha, sizeof(linha), f)) {
-        int id, aid; char aluno[MAX_CPF], arquivo[200], data[30], nota[16], status[20];
-        if (sscanf(linha, "%d,%d,%[^,],%[^,],%[^,],%[^,],%[^\n]",
-                   &id, &aid, aluno, arquivo, data, nota, status) >= 4) {
-            if (!avaliado && id == subId && strcmp(status, "Avaliada") != 0) {
-                printf("Submissao: %s\nAluno: %s\n", arquivo, aluno);
-                float notaF;
-                printf("Informe a nota (ex: 8.5): ");
-                if (scanf("%f", &notaF) != 1) { limparBuffer(); printf("Entrada invalida.\n"); fprintf(tmp, "%s", linha); continue; }
-                limparBuffer();
-                /* confirmacao */
-                char conf;
-                printf("Confirmar avaliacao? (S/N): ");
-                scanf(" %c", &conf); limparBuffer();
-                if (conf != 'S' && conf != 's') {
-                    printf("Avaliacao cancelada.\n");
-                    fprintf(tmp, "%s", linha);
-                } else {
-                    char notaS[16];
-                    snprintf(notaS, sizeof(notaS), "%.2f", notaF);
-                    fprintf(tmp, "%d,%d,%s,%s,%s,%s,%s\n", id, aid, aluno, arquivo, data, notaS, "Avaliada");
-                    avaliado = 1;
-                    printf("Submissao avaliada e registrada.\n");
-                }
-            } else {
-                fprintf(tmp, "%s", linha);
-            }
-        } else {
-            fprintf(tmp, "%s", linha);
+        int id, atividade_id;
+        char tipo[20], cpf[20], disc[100], desc[300], arquivo[200], data[40], nota[16], status[20];
+
+        sscanf(linha, "%d,%[^,],%d,%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%s",
+            &id, tipo, &atividade_id, cpf, disc, desc, arquivo, data, nota, status);
+
+        if (id == idAvaliar && strcmp(tipo, "submissao") == 0) {
+            float notaF;
+            printf("Digite a nota: ");
+            scanf("%f", &notaF);
+            limparBuffer();
+
+            char notaStr[16];
+            snprintf(notaStr, sizeof(notaStr), "%.2f", notaF);
+
+            fprintf(tmp, "%d,%s,%d,%s,%s,%s,%s,%s,%s,Avaliada\n",
+                id, tipo, atividade_id, cpf, disc, desc, arquivo, data, notaStr);
+
+            encontrado = 1;
+        }
+        else {
+            fputs(linha, tmp);
         }
     }
 
-    fclose(f); fclose(tmp);
-    remove(SUBMISSOES_FILE);
-    rename("submissoes_tmp.csv", SUBMISSOES_FILE);
-    if (!avaliado) printf("Submissao nao encontrada ou ja avaliada.\n");
+    fclose(f);
+    fclose(tmp);
+
+    remove(ATIVIDADES_FILE);
+    rename("temp.csv", ATIVIDADES_FILE);
+
+    if (encontrado)
+        printf("Avaliacao concluida.\n");
+    else
+        printf("Submissao nao encontrada.\n");
 }

@@ -1,54 +1,54 @@
-# app.py
 import os
 import csv
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
 from tkinter import messagebox, simpledialog
 
-# -------------------- CONFIG --------------------
+# ============================================================
+# CONFIG
+# ============================================================
 ARQ_USUARIOS = "usuarios.csv"
-ARQ_ATIVIDADES = "atividades.csv"   # atividades enviadas por alunos / avaliadas por prof
-ARQ_NOTAS = "notas.csv"             # lancamento de np1,np2 (sem media aqui)
+ARQ_ATIVIDADES = "atividades.csv"
 THEME = "cyborg"
 
-# -------------------- INICIALIZACAO --------------------
+# ============================================================
+# INICIALIZACAO
+# ============================================================
 def inicializar_arquivos():
-    # usuarios: cpf,senha,nome,tipo
+
+    # usuarios.csv
     if not os.path.exists(ARQ_USUARIOS):
         with open(ARQ_USUARIOS, "w", newline="", encoding="utf-8") as f:
             w = csv.writer(f)
             w.writerow(["cpf","senha","nome","tipo"])
-            # exemplos iniciais
             w.writerow(["11111111111","1234","Joao Silva","aluno"])
             w.writerow(["22222222222","abcd","Prof. Carlos","professor"])
             w.writerow(["33333333333","admin","Administrador","admin"])
-    # atividades: cpf_aluno,disciplina,descricao,status,nota
+
+    # atividades.csv unificado
     if not os.path.exists(ARQ_ATIVIDADES):
         with open(ARQ_ATIVIDADES, "w", newline="", encoding="utf-8") as f:
             w = csv.writer(f)
-            w.writerow(["cpf_aluno","disciplina","descricao","status","nota"])
-    # notas: cpf_aluno,disciplina,nota1,nota2
-    if not os.path.exists(ARQ_NOTAS):
-        with open(ARQ_NOTAS, "w", newline="", encoding="utf-8") as f:
-            w = csv.writer(f)
-            w.writerow(["cpf_aluno","disciplina","nota1","nota2"])
+            w.writerow(["id","tipo","cpf_aluno","disciplina","descricao","status","nota"])
 
-# -------------------- UTILIDADES USUARIOS --------------------
+
+# ============================================================
+# UTIL USUARIOS
+# ============================================================
 def ler_usuarios():
     with open(ARQ_USUARIOS, newline="", encoding="utf-8") as f:
         return list(csv.DictReader(f))
 
-def salvar_usuario(csv_row):
-    # csv_row: dict com cpf,senha,nome,tipo
-    with open(ARQ_USUARIOS, "a", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow([csv_row["cpf"], csv_row["senha"], csv_row["nome"], csv_row["tipo"]])
-
-def sobrescrever_usuarios(lista_dicts):
+def sobrescrever_usuarios(lista):
     with open(ARQ_USUARIOS, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=["cpf","senha","nome","tipo"])
-        writer.writeheader()
-        writer.writerows(lista_dicts)
+        w = csv.DictWriter(f, fieldnames=["cpf","senha","nome","tipo"])
+        w.writeheader()
+        w.writerows(lista)
+
+def salvar_usuario(row):
+    with open(ARQ_USUARIOS, "a", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow([row["cpf"], row["senha"], row["nome"], row["tipo"]])
 
 def usuario_existe(cpf):
     return any(u["cpf"] == cpf for u in ler_usuarios())
@@ -59,77 +59,49 @@ def validar_login(cpf, senha):
             return u
     return None
 
-# -------------------- UTILIDADES ATIVIDADES / NOTAS --------------------
+
+# ============================================================
+# UTIL ATIVIDADES
+# ============================================================
 def ler_atividades():
     with open(ARQ_ATIVIDADES, newline="", encoding="utf-8") as f:
         return list(csv.DictReader(f))
 
 def sobrescrever_atividades(lista):
     with open(ARQ_ATIVIDADES, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=["cpf_aluno","disciplina","descricao","status","nota"])
-        writer.writeheader()
-        writer.writerows(lista)
+        w = csv.DictWriter(f, fieldnames=["id","tipo","cpf_aluno","disciplina","descricao","status","nota"])
+        w.writeheader()
+        w.writerows(lista)
 
-def ler_notas():
-    with open(ARQ_NOTAS, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def gerar_novo_id(ativs):
+    try:
+        ids = [int(a["id"]) for a in ativs]
+        return max(ids) + 1 if ids else 1
+    except:
+        return 1
 
-def salvar_nota_row(row):
-    with open(ARQ_NOTAS, "a", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow([row["cpf_aluno"], row["disciplina"], row["nota1"], row["nota2"]])
 
-# -------------------- FRONTE-END (ttkbootstrap) --------------------
+# ============================================================
+# FRONT-END
+# ============================================================
 inicializar_arquivos()
 app = ttk.Window(themename=THEME)
 app.title("Sistema Educacional PIM")
-app.geometry("700x480")
+app.geometry("800x520")
 
-# -------------------- FUNCOES DO ADMIN --------------------
-def ui_cadastrar_usuario(parent=None):
-    win = ttk.Toplevel(parent or app)
-    win.title("Cadastrar Usuario")
-    win.geometry("420x320")
 
-    ttk.Label(win, text="Cadastrar Usuario", font=("Helvetica", 14, "bold")).pack(pady=8)
+# ============================================================
+# ADMIN - LISTAR / EDITAR / EXCLUIR
+# ============================================================
+def ui_listar_usuarios():
 
-    frm = ttk.Frame(win); frm.pack(pady=6, padx=10, fill=X)
-    ttk.Label(frm, text="CPF:").grid(row=0, column=0, sticky=W, pady=4)
-    e_cpf = ttk.Entry(frm, width=30); e_cpf.grid(row=0, column=1, pady=4)
-    ttk.Label(frm, text="Senha:").grid(row=1, column=0, sticky=W, pady=4)
-    e_senha = ttk.Entry(frm, width=30, show="*"); e_senha.grid(row=1, column=1, pady=4)
-    ttk.Label(frm, text="Nome:").grid(row=2, column=0, sticky=W, pady=4)
-    e_nome = ttk.Entry(frm, width=30); e_nome.grid(row=2, column=1, pady=4)
-    ttk.Label(frm, text="Tipo:").grid(row=3, column=0, sticky=W, pady=4)
-    tipo_var = ttk.StringVar(value="aluno")
-    cb_tipo = ttk.Combobox(frm, textvariable=tipo_var, values=["aluno","professor","admin"], width=28)
-    cb_tipo.grid(row=3, column=1, pady=4)
-
-    def salvar():
-        cpf = e_cpf.get().strip()
-        senha = e_senha.get().strip()
-        nome = e_nome.get().strip()
-        tipo = tipo_var.get().strip()
-        if not (cpf and senha and nome and tipo):
-            messagebox.showwarning("Aviso", "Preencha todos os campos!")
-            return
-        if usuario_existe(cpf):
-            messagebox.showerror("Erro", "CPF ja cadastrado!")
-            return
-        salvar_usuario({"cpf":cpf,"senha":senha,"nome":nome,"tipo":tipo})
-        messagebox.showinfo("Sucesso", "Usuario cadastrado com sucesso!")
-        win.destroy()
-
-    ttk.Button(win, text="Salvar", command=salvar, bootstyle="success").pack(pady=10)
-    ttk.Button(win, text="Cancelar", command=win.destroy, bootstyle="danger").pack()
-
-def ui_listar_usuarios(parent=None):
     usuarios = ler_usuarios()
-    win = ttk.Toplevel(parent or app)
-    win.title("Lista de Usuarios")
-    win.geometry("620x380")
+    win = ttk.Toplevel(app)
+    win.title("Usuarios")
+    win.geometry("650x400")
 
-    ttk.Label(win, text="Usuarios Cadastrados", font=("Helvetica", 14, "bold")).pack(pady=8)
+    ttk.Label(win, text="Usuarios Cadastrados", font=("Helvetica", 14, "bold")).pack(pady=10)
+
     cols = ("cpf","nome","tipo")
     tree = ttk.Treeview(win, columns=cols, show="headings", height=12)
     for c in cols:
@@ -138,244 +110,375 @@ def ui_listar_usuarios(parent=None):
     tree.pack(fill=BOTH, expand=YES, padx=10, pady=6)
 
     for u in usuarios:
-        # ocultar senha por seguranca (nao exibimos)
         tree.insert("", "end", values=(u["cpf"], u["nome"], u["tipo"]))
 
-    def excluir_selecionado():
+    # EXCLUIR USUARIO
+    def excluir():
         sel = tree.focus()
         if not sel:
-            messagebox.showwarning("Aviso", "Selecione um usuario para excluir.")
+            messagebox.showwarning("Aviso","Selecione um usuario.")
             return
-        item = tree.item(sel)["values"]
-        cpf = item[0]
-        nome = item[1]
-        if messagebox.askyesno("Confirmar", f"Excluir usuario {nome} ({cpf})?"):
-            novos = [x for x in usuarios if x["cpf"] != cpf]
-            sobrescrever_usuarios(novos)
-            messagebox.showinfo("Sucesso", "Usuario excluido.")
-            win.destroy()
 
-    def editar_selecionado():
+        cpf = tree.item(sel)["values"][0]
+        nome = tree.item(sel)["values"][1]
+
+        if not messagebox.askyesno("Confirmar", f"Excluir usuario {nome} ({cpf})?"):
+            return
+
+        novos = [u for u in usuarios if u["cpf"] != cpf]
+        sobrescrever_usuarios(novos)
+        messagebox.showinfo("OK","Usuario excluido.")
+        win.destroy()
+
+    # EDITAR
+    def editar():
         sel = tree.focus()
         if not sel:
-            messagebox.showwarning("Aviso", "Selecione um usuario para editar.")
+            messagebox.showwarning("Aviso","Selecione um usuario.")
             return
-        item = tree.item(sel)["values"]
-        cpf_sel = item[0]
+
+        cpf_sel = tree.item(sel)["values"][0]
         usuarios_all = ler_usuarios()
         usuario = next((x for x in usuarios_all if x["cpf"] == cpf_sel), None)
-        if not usuario:
-            messagebox.showerror("Erro", "Usuario nao encontrado.")
-            return
-        # abrir janela de edicao pre-preenchida
+
         ew = ttk.Toplevel(win)
         ew.title("Editar Usuario")
         ew.geometry("420x300")
+
         ttk.Label(ew, text="Editar Usuario", font=("Helvetica", 14, "bold")).pack(pady=8)
-        f = ttk.Frame(ew); f.pack(padx=10, pady=6)
-        ttk.Label(f, text="CPF:").grid(row=0, column=0, sticky=W)
-        ecpf = ttk.Entry(f, width=28); ecpf.grid(row=0, column=1); ecpf.insert(0, usuario["cpf"]); ecpf.config(state="disabled")
-        ttk.Label(f, text="Senha:").grid(row=1, column=0, sticky=W)
-        esenha = ttk.Entry(f, width=28); esenha.grid(row=1, column=1); esenha.insert(0, usuario["senha"])
-        ttk.Label(f, text="Nome:").grid(row=2, column=0, sticky=W)
-        enome = ttk.Entry(f, width=28); enome.grid(row=2, column=1); enome.insert(0, usuario["nome"])
-        ttk.Label(f, text="Tipo:").grid(row=3, column=0, sticky=W)
-        tvar = ttk.StringVar(value=usuario["tipo"])
-        cbt = ttk.Combobox(f, textvariable=tvar, values=["aluno","professor","admin"], width=26); cbt.grid(row=3, column=1)
+
+        f = ttk.Frame(ew); f.pack()
+
+        ttk.Label(f, text="CPF:").grid(row=0,column=0)
+        ecpf = ttk.Entry(f, width=30); ecpf.grid(row=0,column=1)
+        ecpf.insert(0, usuario["cpf"])
+        ecpf.config(state="disabled")
+
+        ttk.Label(f, text="Senha:").grid(row=1,column=0)
+        esenha = ttk.Entry(f, width=30); esenha.grid(row=1,column=1)
+        esenha.insert(0, usuario["senha"])
+
+        ttk.Label(f, text="Nome:").grid(row=2,column=0)
+        enome = ttk.Entry(f, width=30); enome.grid(row=2,column=1)
+        enome.insert(0, usuario["nome"])
+
+        ttk.Label(f, text="Tipo:").grid(row=3,column=0)
+        var = ttk.StringVar(value=usuario["tipo"])
+        cb = ttk.Combobox(f, textvariable=var, values=["aluno","professor","admin"], width=28)
+        cb.grid(row=3,column=1)
+
         def salvar_edicao():
             usuario["senha"] = esenha.get().strip()
             usuario["nome"] = enome.get().strip()
-            usuario["tipo"] = tvar.get().strip()
+            usuario["tipo"] = var.get().strip()
             sobrescrever_usuarios(usuarios_all)
-            messagebox.showinfo("Sucesso", "Usuario atualizado.")
+            messagebox.showinfo("OK","Atualizado.")
             ew.destroy()
             win.destroy()
-        ttk.Button(ew, text="Salvar", command=salvar_edicao, bootstyle="success").pack(pady=8)
+
+        ttk.Button(ew, text="Salvar", command=salvar_edicao, bootstyle="success").pack(pady=10)
         ttk.Button(ew, text="Cancelar", command=ew.destroy, bootstyle="danger").pack()
 
-    btns = ttk.Frame(win); btns.pack(pady=6)
-    ttk.Button(btns, text="Excluir Selecionado", command=excluir_selecionado, bootstyle="danger").grid(row=0, column=0, padx=6)
-    ttk.Button(btns, text="Editar Selecionado", command=editar_selecionado, bootstyle="warning").grid(row=0, column=1, padx=6)
-    ttk.Button(btns, text="Fechar", command=win.destroy, bootstyle="secondary").grid(row=0, column=2, padx=6)
+    btns = ttk.Frame(win); btns.pack(pady=8)
+    ttk.Button(btns, text="Excluir", command=excluir, bootstyle="danger").grid(row=0,column=0,padx=8)
+    ttk.Button(btns, text="Editar", command=editar, bootstyle="warning").grid(row=0,column=1,padx=8)
+    ttk.Button(btns, text="Fechar", command=win.destroy, bootstyle="secondary").grid(row=0,column=2,padx=8)
 
-# -------------------- FUNCOES DO ALUNO --------------------
-def ui_enviar_atividade(cpf_aluno):
-    win = ttk.Toplevel(app)
-    win.title("Enviar Atividade")
-    win.geometry("440x320")
-    ttk.Label(win, text="Enviar Atividade", font=("Helvetica", 14, "bold")).pack(pady=8)
-    frm = ttk.Frame(win); frm.pack(padx=10, pady=6)
-    ttk.Label(frm, text="Disciplina:").grid(row=0, column=0, sticky=W)
-    e_disc = ttk.Entry(frm, width=36); e_disc.grid(row=0, column=1, pady=6)
-    ttk.Label(frm, text="Descricao:").grid(row=1, column=0, sticky=W)
-    e_desc = ttk.Entry(frm, width=36); e_desc.grid(row=1, column=1, pady=6)
-    def enviar():
-        disc = e_disc.get().strip(); desc = e_desc.get().strip()
-        if not (disc and desc):
-            messagebox.showwarning("Aviso", "Preencha todos os campos!")
-            return
-        if not messagebox.askyesno("Confirmar", "Confirmar envio da atividade?"):
-            return
-        with open(ARQ_ATIVIDADES, "a", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            writer.writerow([cpf_aluno, disc, desc, "Pendente", ""])
-        messagebox.showinfo("Sucesso", "Atividade enviada.")
-        win.destroy()
-    ttk.Button(win, text="Enviar", command=enviar, bootstyle="success").pack(pady=10)
-    ttk.Button(win, text="Cancelar", command=win.destroy, bootstyle="danger").pack()
 
-def ui_ver_notas(cpf_aluno):
-    win = ttk.Toplevel(app)
-    win.title("Boletim")
-    win.geometry("520x360")
-    ttk.Label(win, text="Boletim do Aluno", font=("Helvetica", 14, "bold")).pack(pady=8)
-    tree = ttk.Treeview(win, columns=("disciplina","nota1","nota2"), show="headings")
-    for c in ("disciplina","nota1","nota2"):
-        tree.heading(c, text=c.upper())
-        tree.column(c, width=150, anchor="center")
-    tree.pack(fill=BOTH, expand=YES, padx=10, pady=8)
-    notas = ler_notas()
-    for n in notas:
-        if n["cpf_aluno"] == cpf_aluno:
-            tree.insert("", "end", values=(n["disciplina"], n["nota1"], n["nota2"]))
-    ttk.Button(win, text="Fechar", command=win.destroy, bootstyle="secondary").pack(pady=8)
+# ============================================================
+# ADMIN - CADASTRAR
+# ============================================================
+def ui_cadastrar_usuario():
 
-# -------------------- FUNCOES DO PROFESSOR --------------------
-def ui_postar_atividade():
     win = ttk.Toplevel(app)
-    win.title("Postar Atividade (professor)")
-    win.geometry("460x320")
-    ttk.Label(win, text="Postar Atividade", font=("Helvetica", 14, "bold")).pack(pady=8)
-    frm = ttk.Frame(win); frm.pack(padx=10, pady=6)
-    ttk.Label(frm, text="Disciplina:").grid(row=0, column=0, sticky=W)
-    e_disc = ttk.Entry(frm, width=36); e_disc.grid(row=0, column=1, pady=6)
-    ttk.Label(frm, text="Descricao:").grid(row=1, column=0, sticky=W)
-    e_desc = ttk.Entry(frm, width=36); e_desc.grid(row=1, column=1, pady=6)
+    win.title("Cadastrar Usuario")
+    win.geometry("420x300")
+
+    ttk.Label(win, text="Cadastrar Usuario", font=("Helvetica", 14, "bold")).pack(pady=10)
+
+    f = ttk.Frame(win); f.pack()
+    ttk.Label(f, text="CPF:").grid(row=0,column=0,pady=6)
+    e_cpf = ttk.Entry(f, width=32); e_cpf.grid(row=0,column=1)
+
+    ttk.Label(f, text="Senha:").grid(row=1,column=0,pady=6)
+    e_senha = ttk.Entry(f, width=32, show="*"); e_senha.grid(row=1,column=1)
+
+    ttk.Label(f, text="Nome:").grid(row=2,column=0,pady=6)
+    e_nome = ttk.Entry(f, width=32); e_nome.grid(row=2,column=1)
+
+    ttk.Label(f, text="Tipo:").grid(row=3,column=0,pady=6)
+    var = ttk.StringVar(value="aluno")
+    cb = ttk.Combobox(f, textvariable=var, values=["aluno","professor","admin"], width=30)
+    cb.grid(row=3,column=1)
+
     def salvar():
-        disc = e_disc.get().strip(); desc = e_desc.get().strip()
-        if not (disc and desc):
-            messagebox.showwarning("Aviso", "Preencha todos os campos!")
+        cpf = e_cpf.get().strip()
+        senha = e_senha.get().strip()
+        nome = e_nome.get().strip()
+        tipo = var.get()
+
+        if not (cpf and senha and nome):
+            messagebox.showwarning("Aviso","Preencha tudo.")
             return
-        # postamos uma atividade "modelo" para os alunos; em muitos cenarios, professor postaria em outro CSV
-        if not messagebox.askyesno("Confirmar", "Confirmar publicacao da atividade?"):
+
+        if usuario_existe(cpf):
+            messagebox.showerror("Erro","CPF ja cadastrado.")
             return
-        # aqui apenas notifica (atividade "publicada") - professores normalmente adicionariam em conteudos/atividades globais
-        messagebox.showinfo("Sucesso", "Atividade publicada (visivel aos alunos via formulario).")
+
+        salvar_usuario({"cpf":cpf,"senha":senha,"nome":nome,"tipo":tipo})
+        messagebox.showinfo("OK","Cadastrado.")
         win.destroy()
-    ttk.Button(win, text="Publicar", command=salvar, bootstyle="success").pack(pady=10)
+
+    ttk.Button(win, text="Salvar", command=salvar, bootstyle="success").pack(pady=10)
     ttk.Button(win, text="Cancelar", command=win.destroy, bootstyle="danger").pack()
 
-def ui_listar_atividades_para_avaliacao():
-    # mostra atividades em ARQ_ATIVIDADES para o professor selecionar e avaliar
-    atividades = ler_atividades()
+
+# ============================================================
+# PROFESSOR - POSTAR ATIVIDADE
+# ============================================================
+def ui_postar_atividade():
+
     win = ttk.Toplevel(app)
-    win.title("Avaliar Atividades")
+    win.title("Postar Atividade")
+    win.geometry("480x300")
+
+    ttk.Label(win, text="Postar Atividade", font=("Helvetica", 14, "bold")).pack(pady=10)
+
+    f = ttk.Frame(win); f.pack()
+    ttk.Label(f, text="Disciplina:").grid(row=0,column=0,pady=6)
+    e_disc = ttk.Entry(f, width=36); e_disc.grid(row=0,column=1)
+
+    ttk.Label(f, text="Descricao:").grid(row=1,column=0,pady=6)
+    e_desc = ttk.Entry(f, width=36); e_desc.grid(row=1,column=1)
+
+    def salvar():
+        disc = e_disc.get().strip()
+        desc = e_desc.get().strip()
+
+        if not (disc and desc):
+            messagebox.showwarning("Aviso","Preencha tudo.")
+            return
+
+        ativs = ler_atividades()
+        novo_id = gerar_novo_id(ativs)
+
+        ativs.append({
+            "id": str(novo_id),
+            "tipo": "publicada",
+            "cpf_aluno": "",
+            "disciplina": disc,
+            "descricao": desc,
+            "status": "Publicada",
+            "nota": ""
+        })
+
+        sobrescrever_atividades(ativs)
+        messagebox.showinfo("OK","Atividade publicada.")
+        win.destroy()
+
+    ttk.Button(win, text="Publicar", command=salvar, bootstyle="success").pack(pady=10)
+
+
+# ============================================================
+# ALUNO - VER ATIVIDADES PUBLICADAS
+# ============================================================
+def ui_ver_atividades(cpf):
+
+    ativs = ler_atividades()
+    publicadas = [a for a in ativs if a["tipo"] == "publicada"]
+
+    win = ttk.Toplevel(app)
+    win.title("Atividades Disponiveis")
     win.geometry("760x420")
-    ttk.Label(win, text="Submissoes de Atividades", font=("Helvetica", 14, "bold")).pack(pady=8)
-    cols = ("cpf_aluno","disciplina","descricao","status","nota")
-    tree = ttk.Treeview(win, columns=cols, show="headings", height=14)
+
+    ttk.Label(win, text="Atividades Disponiveis", font=("Helvetica", 14, "bold")).pack(pady=10)
+
+    cols = ("id","disciplina","descricao","status")
+    tree = ttk.Treeview(win, columns=cols, show="headings")
     for c in cols:
-        tree.heading(c, text=c.upper()); tree.column(c, width=140, anchor="center")
-    tree.pack(fill=BOTH, expand=YES, padx=10, pady=8)
-    for a in atividades:
-        tree.insert("", "end", values=(a["cpf_aluno"], a["disciplina"], a["descricao"], a["status"], a["nota"]))
+        tree.heading(c, text=c.upper())
+        tree.column(c, width=160, anchor="center")
+    tree.pack(fill=BOTH, expand=YES, padx=10, pady=10)
+
+    for a in publicadas:
+        tree.insert("", "end", values=(a["id"], a["disciplina"], a["descricao"], a["status"]))
+
+    def enviar():
+        sel = tree.focus()
+        if not sel:
+            messagebox.showwarning("Aviso","Selecione uma atividade.")
+            return
+
+        vals = tree.item(sel)["values"]
+        atividade_id = vals[0]
+        disciplina = vals[1]
+
+        resp = simpledialog.askstring("Resposta","Digite sua resposta:")
+        if not resp:
+            return
+
+        ativs = ler_atividades()
+
+        ativs.append({
+            "id": str(atividade_id),
+            "tipo": "submissao",
+            "cpf_aluno": cpf,
+            "disciplina": disciplina,
+            "descricao": resp,
+            "status": "Pendente",
+            "nota": ""
+        })
+
+        sobrescrever_atividades(ativs)
+        messagebox.showinfo("OK","Submissao enviada.")
+        win.destroy()
+
+    ttk.Button(win, text="Enviar Submissao", command=enviar, bootstyle="success").pack(pady=8)
+
+
+# ============================================================
+# ALUNO - MINHAS SUBMISSOES
+# ============================================================
+def ui_minhas_submissoes(cpf):
+
+    ativs = ler_atividades()
+    minhas = [a for a in ativs if a["tipo"] == "submissao" and a["cpf_aluno"] == cpf]
+
+    win = ttk.Toplevel(app)
+    win.title("Minhas Submissoes")
+    win.geometry("760x420")
+
+    ttk.Label(win, text="Minhas Submissoes", font=("Helvetica", 14, "bold")).pack(pady=10)
+
+    cols = ("id","disc","descricao","status","nota")
+    tree = ttk.Treeview(win, columns=cols, show="headings")
+    for c in cols:
+        tree.heading(c, text=c.upper())
+        tree.column(c, width=140, anchor="center")
+    tree.pack(fill=BOTH, expand=YES, padx=10, pady=10)
+
+    for a in minhas:
+        tree.insert("", "end", values=(a["id"], a["disciplina"], a["descricao"], a["status"], a["nota"]))
+
+
+# ============================================================
+# PROFESSOR - AVALIAR SUBMISSOES
+# ============================================================
+def ui_avaliar():
+
+    ativs = ler_atividades()
+    subs = [a for a in ativs if a["tipo"] == "submissao"]
+
+    win = ttk.Toplevel(app)
+    win.title("Avaliar Submissoes")
+    win.geometry("760x420")
+
+    ttk.Label(win, text="Avaliar Submissoes", font=("Helvetica", 14, "bold")).pack(pady=10)
+
+    cols = ("cpf","id","disc","descricao","status","nota")
+    tree = ttk.Treeview(win, columns=cols, show="headings")
+    for c in cols:
+        tree.heading(c, text=c.upper())
+        tree.column(c, width=120, anchor="center")
+    tree.pack(fill=BOTH, expand=YES, padx=10, pady=10)
+
+    for a in subs:
+        tree.insert("", "end", values=(a["cpf_aluno"], a["id"], a["disciplina"], a["descricao"], a["status"], a["nota"]))
+
     def avaliar():
         sel = tree.focus()
         if not sel:
-            messagebox.showwarning("Aviso", "Selecione uma submissao para avaliar.")
+            messagebox.showwarning("Aviso","Selecione.")
             return
+
         vals = tree.item(sel)["values"]
-        cpf_aluno, disc = vals[0], vals[1]
-        nota = simpledialog.askstring("Nota", f"Informe a nota para {cpf_aluno} - {disc}:")
-        if nota is None:
+        cpf = vals[0]
+        atividade_id = vals[1]
+        descricao = vals[3]
+
+        nota = simpledialog.askstring("Nota","Informe a nota:")
+        if not nota:
             return
-        if not messagebox.askyesno("Confirmar", "Confirmar avaliacao e atribuicao da nota?"):
-            return
-        # atualizar lista e reescrever CSV
-        for a in atividades:
-            if a["cpf_aluno"] == cpf_aluno and a["disciplina"] == disc and a["descricao"] == vals[2]:
+
+        for a in ativs:
+            if a["tipo"] == "submissao" and a["cpf_aluno"] == cpf and a["id"] == str(atividade_id) and a["descricao"] == descricao:
                 a["nota"] = nota
                 a["status"] = "Avaliada"
-        sobrescrever_atividades(atividades)
-        messagebox.showinfo("Sucesso", "Atividade avaliada.")
-        win.destroy()
-    ttk.Button(win, text="Avaliar Selecionada", command=avaliar, bootstyle="success").pack(pady=6)
-    ttk.Button(win, text="Fechar", command=win.destroy, bootstyle="secondary").pack(pady=4)
 
-def ui_lancar_notas():
-    win = ttk.Toplevel(app)
-    win.title("Lancar Notas (professor)")
-    win.geometry("460x380")
-    ttk.Label(win, text="Lancar Notas (NP1 / NP2)", font=("Helvetica", 14, "bold")).pack(pady=8)
-    frm = ttk.Frame(win); frm.pack(padx=10, pady=6)
-    ttk.Label(frm, text="CPF do Aluno:").grid(row=0, column=0, sticky=W); e_cpf = ttk.Entry(frm, width=30); e_cpf.grid(row=0, column=1, pady=4)
-    ttk.Label(frm, text="Disciplina:").grid(row=1, column=0, sticky=W); e_disc = ttk.Entry(frm, width=30); e_disc.grid(row=1, column=1, pady=4)
-    ttk.Label(frm, text="Nota 1:").grid(row=2, column=0, sticky=W); e_n1 = ttk.Entry(frm, width=30); e_n1.grid(row=2, column=1, pady=4)
-    ttk.Label(frm, text="Nota 2:").grid(row=3, column=0, sticky=W); e_n2 = ttk.Entry(frm, width=30); e_n2.grid(row=3, column=1, pady=4)
-    def salvar():
-        cpf = e_cpf.get().strip(); disc = e_disc.get().strip(); n1 = e_n1.get().strip(); n2 = e_n2.get().strip()
-        if not (cpf and disc and n1 and n2):
-            messagebox.showwarning("Aviso", "Preencha todos os campos!")
-            return
-        if not messagebox.askyesno("Confirmar", "Confirmar lancamento das notas?"):
-            return
-        salvar_nota_row({"cpf_aluno":cpf,"disciplina":disc,"nota1":n1,"nota2":n2})
-        messagebox.showinfo("Sucesso", "Notas lancadas.")
+        sobrescrever_atividades(ativs)
+        messagebox.showinfo("OK","Avaliado.")
         win.destroy()
-    ttk.Button(win, text="Salvar", command=salvar, bootstyle="success").pack(pady=8)
-    ttk.Button(win, text="Cancelar", command=win.destroy, bootstyle="danger").pack()
 
-# -------------------- MENUS (apos login) --------------------
+    ttk.Button(win, text="Avaliar Selecionada", command=avaliar, bootstyle="success").pack(pady=8)
+
+
+# ============================================================
+# MENU APOS LOGIN
+# ============================================================
 def abrir_menu(usuario):
-    tipo = usuario["tipo"]
+
+    win = ttk.Toplevel(app)
+    win.title("Menu")
+    win.geometry("400x430")
+
     nome = usuario["nome"]
+    tipo = usuario["tipo"]
     cpf = usuario["cpf"]
 
-    win = ttk.Toplevel(app)
-    win.title(f"Menu - {nome}")
-    win.geometry("520x360")
-    ttk.Label(win, text=f"Bem-vindo(a), {nome}!", font=("Helvetica", 16, "bold")).pack(pady=10)
+    ttk.Label(win, text=f"Bem-vindo, {nome}", font=("Helvetica", 16, "bold")).pack(pady=12)
 
     if tipo == "aluno":
-        ttk.Button(win, text="Ver Boletim", command=lambda: ui_ver_notas(cpf), bootstyle="info").pack(pady=6)
-        ttk.Button(win, text="Enviar Atividade", command=lambda: ui_enviar_atividade(cpf), bootstyle="success").pack(pady=6)
+        ttk.Button(win, text="Ver Atividades", command=lambda: ui_ver_atividades(cpf), bootstyle="info").pack(pady=6)
+        ttk.Button(win, text="Minhas Submissoes", command=lambda: ui_minhas_submissoes(cpf), bootstyle="success").pack(pady=6)
 
     elif tipo == "professor":
         ttk.Button(win, text="Postar Atividade", command=ui_postar_atividade, bootstyle="primary").pack(pady=6)
-        ttk.Button(win, text="Listar/Avaliar Submissoes", command=ui_listar_atividades_para_avaliacao, bootstyle="info").pack(pady=6)
-        ttk.Button(win, text="Lancar Notas (NP1/NP2)", command=ui_lancar_notas, bootstyle="warning").pack(pady=6)
+        ttk.Button(win, text="Avaliar Submissoes", command=ui_avaliar, bootstyle="danger").pack(pady=6)
 
     elif tipo == "admin":
-        ttk.Button(win, text="Cadastrar Usuario", command=lambda: ui_cadastrar_usuario(win), bootstyle="success").pack(pady=8)
-        ttk.Button(win, text="Listar/Excluir/Editar Usuarios", command=lambda: ui_listar_usuarios(win), bootstyle="info").pack(pady=6)
+        ttk.Button(win, text="Cadastrar Usuario", command=ui_cadastrar_usuario, bootstyle="success").pack(pady=6)
+        ttk.Button(win, text="Listar Usuarios", command=ui_listar_usuarios, bootstyle="info").pack(pady=6)
 
-    ttk.Button(win, text="Fechar Menu", command=win.destroy, bootstyle="danger").pack(pady=12)
+    ttk.Button(win, text="Sair", command=win.destroy, bootstyle="secondary").pack(pady=16)
 
-# -------------------- LOGIN PRINCIPAL --------------------
+
+# ============================================================
+# LOGIN
+# ============================================================
 def fazer_login():
+
     cpf = entry_cpf.get().strip()
     senha = entry_senha.get().strip()
-    if not (cpf and senha):
-        messagebox.showwarning("Aviso", "Preencha todos os campos!")
-        return
-    usuario = validar_login(cpf, senha)
-    if usuario is None:
-        messagebox.showerror("Erro", "CPF ou senha incorretos!")
-        return
-    messagebox.showinfo("Sucesso", f"Logado como {usuario['tipo']}")
-    abrir_menu(usuario)
 
-# -------------------- TELA PRINCIPAL --------------------
-frame = ttk.Frame(app, padding=18); frame.pack(expand=YES)
-ttk.Label(frame, text="SISTEMA EDUCACIONAL PIM", font=("Helvetica", 20, "bold")).pack(pady=6)
-ttk.Label(frame, text="Login por CPF", font=("Helvetica", 10)).pack(pady=2)
-f = ttk.Frame(frame); f.pack(pady=8)
-ttk.Label(f, text="CPF:").grid(row=0, column=0, sticky=W, padx=6, pady=6)
-entry_cpf = ttk.Entry(f, width=36); entry_cpf.grid(row=0, column=1, pady=6)
-ttk.Label(f, text="Senha:").grid(row=1, column=0, sticky=W, padx=6, pady=6)
-entry_senha = ttk.Entry(f, width=36, show="*"); entry_senha.grid(row=1, column=1, pady=6)
-ttk.Button(frame, text="Entrar", command=fazer_login, bootstyle="primary").pack(pady=10)
-ttk.Button(frame, text="Sair", command=app.destroy, bootstyle="danger").pack()
+    if not cpf or not senha:
+        messagebox.showwarning("Aviso","Preencha CPF e senha.")
+        return
 
-# -------------------- EXEC --------------------
+    user = validar_login(cpf, senha)
+    if user is None:
+        messagebox.showerror("Erro","CPF ou senha incorretos.")
+        return
+
+    abrir_menu(user)
+
+
+# ============================================================
+# TELA PRINCIPAL
+# ============================================================
+f = ttk.Frame(app, padding=20)
+f.pack(expand=YES)
+
+ttk.Label(f, text="SISTEMA EDUCACIONAL PIM", font=("Helvetica", 20, "bold")).pack(pady=10)
+
+frm = ttk.Frame(f); frm.pack(pady=10)
+
+ttk.Label(frm, text="CPF:").grid(row=0,column=0,pady=8)
+entry_cpf = ttk.Entry(frm, width=42); entry_cpf.grid(row=0,column=1)
+
+ttk.Label(frm, text="Senha:").grid(row=1,column=0,pady=8)
+entry_senha = ttk.Entry(frm, width=42, show="*"); entry_senha.grid(row=1,column=1)
+
+ttk.Button(f, text="Entrar", command=fazer_login, bootstyle="primary").pack(pady=10)
+ttk.Button(f, text="Sair", command=app.destroy, bootstyle="danger").pack()
+
 app.mainloop()

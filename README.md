@@ -99,5 +99,5 @@ Colaboradores
 	•	Gabriel Souza: souzaknn@gmail.com
 	•	Vitor Gabriel: vitor.geraldo.vg7@gmail.com
 	•	João Vitor: ffc.joaovitor@gmail.com
-        •       Lucas: lucas.santana80@aluno.unip.br
-        •       Julia: 
+    •   Lucas: lucas.santana80@aluno.unip.br
+    •   Julia: juliapeneluppi@gmail.com

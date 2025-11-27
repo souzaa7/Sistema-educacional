@@ -1,0 +1,3 @@
+id,tipo,cpf_aluno,disciplina,descricao,status,nota
+1,publicada,,python,como postar um hello world,Publicada,
+1,submissao,11122233344,python,"print(""hello world"")",Pendente,
