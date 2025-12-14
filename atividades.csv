@@ -1,1 +1,7 @@
+<<<<<<< HEAD
 cpf_aluno,disciplina,descricao,status,nota
+=======
+id,tipo,cpf_aluno,disciplina,descricao,status,nota,sub_id
+1,publicada,,mat,1 + 1,Publicada,,
+1,submissao,98765432110,mat,2,Avaliada,10,1
+>>>>>>> a29fc4ff70bd770e23f77e269c0ceb7a4621850c
